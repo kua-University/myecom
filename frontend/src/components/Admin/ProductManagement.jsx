@@ -4,15 +4,16 @@ import toast from 'react-hot-toast';
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
-  const initialState = { 
-    name: '', 
-    description: '', 
-    price: '', 
-    stock_quantity: '', 
-    category_id: '', 
-    image_url: '' 
-  };
-  const [form, setForm] = useState(initialState);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    price: '',
+    stock_quantity: '',
+    category_id: '',
+    image_url: ''
+  });
   const [editingId, setEditingId] = useState(null);
 
   const fetchProducts = async () => {
@@ -20,118 +21,307 @@ const ProductManagement = () => {
       const res = await API.get('/products?limit=100');
       setProducts(res.data);
     } catch (err) {
-      toast.error('Failed to fetch products');
+      console.error('Fetch products error:', err);
+      toast.error('Failed to load products');
     }
   };
 
-  useEffect(() => { 
-    fetchProducts(); 
+  const fetchCategories = async () => {
+    try {
+      const res = await API.get('/categories');
+      setCategories(res.data);
+    } catch (err) {
+      console.error('Fetch categories error:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
   }, []);
 
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const resetForm = () => {
+    setForm({
+      name: '',
+      description: '',
+      price: '',
+      stock_quantity: '',
+      category_id: '',
+      image_url: ''
+    });
+    setEditingId(null);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const payload = { 
-        ...form, 
-        price: parseFloat(form.price), 
-        stock_quantity: parseInt(form.stock_quantity) 
-      };
+    
+    // Validate
+    if (!form.name.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+    if (!form.price || parseFloat(form.price) <= 0) {
+      toast.error('Valid price is required');
+      return;
+    }
+    if (form.stock_quantity === '' || parseInt(form.stock_quantity) < 0) {
+      toast.error('Valid stock quantity is required');
+      return;
+    }
 
+    setLoading(true);
+
+    const payload = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      price: parseFloat(form.price),
+      stock_quantity: parseInt(form.stock_quantity),
+      category_id: form.category_id ? parseInt(form.category_id) : null,
+      image_url: form.image_url.trim() || null
+    };
+
+    console.log('Submitting product:', payload);
+    console.log('Token:', localStorage.getItem('token')?.substring(0, 20) + '...');
+
+    try {
       if (editingId) {
         await API.put(`/products/${editingId}`, payload);
-        toast.success('Product updated');
+        toast.success('Product updated successfully');
       } else {
-        await API.post('/products', payload);
-        toast.success('Product created');
+        const response = await API.post('/products', payload);
+        console.log('Create response:', response.data);
+        toast.success(`Product created! ID: ${response.data.id}`);
       }
-      
-      setForm(initialState);
-      setEditingId(null);
+      resetForm();
       fetchProducts();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Error saving product');
+      console.error('Error:', err.response || err);
+      const message = err.response?.data?.message || 'Failed to save product';
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const editProduct = (prod) => {
     setEditingId(prod.id);
     setForm({
-      name: prod.name,
+      name: prod.name || '',
       description: prod.description || '',
-      price: prod.price.toString(),
-      stock_quantity: prod.stock_quantity.toString(),
-      category_id: prod.category_id || '',
+      price: prod.price?.toString() || '',
+      stock_quantity: prod.stock_quantity?.toString() || '',
+      category_id: prod.category_id?.toString() || '',
       image_url: prod.image_url || ''
     });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteProduct = async (id) => {
-    if (window.confirm('Delete this product?')) {
-      try {
-        await API.delete(`/products/${id}`);
-        fetchProducts();
-        toast.success('Deleted');
-      } catch (err) {
-        toast.error('Error deleting product');
-      }
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      await API.delete(`/products/${id}`);
+      toast.success('Product deleted');
+      fetchProducts();
+    } catch (err) {
+      toast.error('Failed to delete product');
     }
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setForm(initialState);
-  };
-
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Manage Products</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '400px', marginBottom: '20px' }}>
-        <input name="name" placeholder="Name" value={form.name} onChange={handleChange} required />
-        <textarea name="description" placeholder="Description" value={form.description} onChange={handleChange} />
-        <input name="price" type="number" step="0.01" placeholder="Price" value={form.price} onChange={handleChange} required />
-        <input name="stock_quantity" type="number" placeholder="Stock" value={form.stock_quantity} onChange={handleChange} required />
-        <input name="category_id" type="number" placeholder="Category ID" value={form.category_id} onChange={handleChange} />
-        <input name="image_url" placeholder="Image URL" value={form.image_url} onChange={handleChange} />
+    <div>
+      <h2>Product Management</h2>
+      
+      <div style={{ 
+        background: '#f8f9fa', 
+        padding: '1.5rem', 
+        borderRadius: '8px', 
+        marginBottom: '2rem',
+        border: '1px solid #dee2e6'
+      }}>
+        <h3>{editingId ? 'Edit Product' : 'Add New Product'}</h3>
         
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button type="submit">{editingId ? 'Update' : 'Create'}</button>
-          {editingId && (
-            <button type="button" onClick={handleCancel}>
-              Cancel
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>Product Name *</label>
+            <input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Enter product name"
+              required
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>Description</label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              placeholder="Enter product description"
+              rows="3"
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical' }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>Price ($) *</label>
+              <input
+                name="price"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={form.price}
+                onChange={handleChange}
+                placeholder="0.00"
+                required
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>Stock Quantity *</label>
+              <input
+                name="stock_quantity"
+                type="number"
+                min="0"
+                value={form.stock_quantity}
+                onChange={handleChange}
+                placeholder="0"
+                required
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>Category</label>
+              <select
+                name="category_id"
+                value={form.category_id}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+              >
+                <option value="">-- Select Category --</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div style={{ flex: 2, minWidth: '250px' }}>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>Image URL</label>
+              <input
+                name="image_url"
+                value={form.image_url}
+                onChange={handleChange}
+                placeholder="https://example.com/image.jpg"
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <button 
+              type="submit" 
+              disabled={loading}
+              style={{ 
+                padding: '0.6rem 1.5rem', 
+                background: loading ? '#95a5a6' : '#27ae60', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '4px', 
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              {loading ? 'Saving...' : editingId ? 'Update Product' : 'Create Product'}
             </button>
-          )}
-        </div>
-      </form>
+            
+            {editingId && (
+              <button 
+                type="button" 
+                onClick={resetForm}
+                style={{ 
+                  padding: '0.6rem 1.5rem', 
+                  background: '#e74c3c', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
 
-      <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Price</th>
-            <th>Stock</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map(p => (
-            <tr key={p.id}>
-              <td>{p.id}</td>
-              <td>{p.name}</td>
-              <td>${p.price}</td>
-              <td>{p.stock_quantity}</td>
-              <td>
-                <button onClick={() => editProduct(p)}>Edit</button>
-                <button onClick={() => deleteProduct(p.id)} style={{ marginLeft: '5px', color: 'red' }}>Delete</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <h3>Product List ({products.length})</h3>
+      
+      {products.length === 0 ? (
+        <p>No products yet. Use the form above to add one.</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f2f2f2' }}>
+                <th style={thStyle}>ID</th>
+                <th style={thStyle}>Image</th>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Price</th>
+                <th style={thStyle}>Stock</th>
+                <th style={thStyle}>Category</th>
+                <th style={thStyle}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td style={tdStyle}>{p.id}</td>
+                  <td style={tdStyle}>
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={tdStyle}>{p.name}</td>
+                  <td style={tdStyle}>${parseFloat(p.price).toFixed(2)}</td>
+                  <td style={tdStyle}>{p.stock_quantity}</td>
+                  <td style={tdStyle}>{p.category_id || '—'}</td>
+                  <td style={tdStyle}>
+                    <button onClick={() => editProduct(p)} style={btnStyle}>Edit</button>
+                    <button onClick={() => deleteProduct(p.id)} style={{ ...btnStyle, background: '#e74c3c' }}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
+};
+
+const thStyle = { padding: '0.6rem', border: '1px solid #ddd', textAlign: 'left' };
+const tdStyle = { padding: '0.5rem', border: '1px solid #ddd' };
+const btnStyle = { 
+  padding: '0.3rem 0.7rem', 
+  marginRight: '0.3rem', 
+  background: '#3498db', 
+  color: 'white', 
+  border: 'none', 
+  borderRadius: '3px', 
+  cursor: 'pointer' 
 };
 
 export default ProductManagement;
