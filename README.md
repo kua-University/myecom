@@ -7,10 +7,8 @@ A complete e-commerce web application built with React, Node.js, Express, and My
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express)
 ![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker)
-![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=github-actions&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
 ![Git](https://img.shields.io/badge/Git-F05032?logo=git&logoColor=white)
 ![npm](https://img.shields.io/badge/npm-CB3837?logo=npm&logoColor=white)
 
